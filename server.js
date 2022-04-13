@@ -5986,48 +5986,6 @@ function stopTimer (){
 // The NPC function
     let makenpcs = (() => {
         // Return the spawning function
-let sancount = 4; //How many sanctuaries did you put 
-if (room.bas1) //Sanctuary Room
-    for (let loc of room.bas1) {
-         let o = new Entity(loc);
-         o.define(Class.sanctuary);
-         o.team = -1;
-         o.SIZE = 60;
-         o.color = 10;
-         o.ondeath = () => {
-           let i = new Entity(loc);
-           i.define(Class.neutraldom);
-           i.team = -100;
-           i.SIZE = 60;
-           i.color = 3;
-           sancount -= 1;
-           sockets.broadcast("A sanctuary has been destroyed!"); //+ sancount + " Sanctuaries Alive.");
-           util.log("[INFO]" + sancount + " Sanctuaries Left.");
-           if (sancount === 0) {
-            canspawn = false;
-            sockets.broadcast("All Sanctuaries have been Destroyed, Your team will lose in 60 seconds"); 
-           timeThing();
-            }
-           i.ondeath = () => {
-             let e = new Entity(loc);
-             e.define(Class.sanctuary)
-             e.team = -1;
-             e.SIZE = 60;
-             e.color = 10;
-             sancount += 1;
-             sockets.broadcast("A sanctuary has been restored!"); //+ sancount + " Sanctuaries Alive.");
-             util.log("[INFO]" + sancount + " Sanctuaries Left.");
-             if (sancount === 1){ 
-              stopTimer(); 
-             if(reset === true){
-               canspawn = true;
-                }
-             }
-             e.ondeath = o.ondeath;
-             o = e;
-          };
-     };
- }
         let bots = [];
         return () => {
             let census = {
