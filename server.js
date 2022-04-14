@@ -2853,11 +2853,11 @@ class Entity {
             this.damp = 0.05;
             break;
         case "grow":
-            this.SIZE += 1.34;
+            this.SIZE5 += 1.34;
             this.maxSpeed = this.topSpeed;
             break;
         case "grow2":
-            this.SIZE += 9.53;
+            this.SIZE += 15.53;
             this.maxSpeed = this.topSpeed;
             break;
         case "shrink":
