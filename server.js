@@ -4639,9 +4639,8 @@ break;
                 // This is the public information we need for broadcasting
                 let readlb
                 // Define fundamental functions
-                /*const getminimap = (() => {
+                const getminimap = (() => {
                   let all = {
-                    walls: [],
                     players: {},
                     minibosses: [],
                   }
@@ -4846,7 +4845,7 @@ break;
                         // Return the reader
                         return full => full ? lb.full : lb.updates
                     }
-                })()*/
+                })()
                 // Util
                 let getBarColor = entry => {
                   switch (entry.team) {
