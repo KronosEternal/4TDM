@@ -3062,13 +3062,14 @@ class Entity {
             this.accel.y -= Math.min(this.y - this.realSize + 50, 0) * c.ROOM_BOUND_FORCE / roomSpeed;
             this.accel.y -= Math.max(this.y + this.realSize - room.height - 50, 0) * c.ROOM_BOUND_FORCE / roomSpeed;
         }
-        if (room.gameMode.endsWith('tdm') && this.type !== 'food') { 
+        if (room.gameMode === '4tdm' && this.type !== 'food') { 
             let loc = { x: this.x, y: this.y, };
             if (
-                (this.team !== -100 && room.isIn('bas3', loc))
-            ) { 
-              this.kill(); 
-            }
+                (this.team !== -1 && room.isIn('bas1', loc)) ||
+                (this.team !== -2 && room.isIn('bas2', loc)) ||
+                (this.team !== -3 && room.isIn('bas3', loc)) ||
+                (this.team !== -4 && room.isIn('bas4', loc))
+            ) { this.kill(); }
         }
     }
     contemplationOfMortality() {
@@ -4323,16 +4324,58 @@ break;
                     let player = {}, loc = {};
                     // Find the desired team (if any) and from that, where you ought to spawn
                     player.team = socket.rememberedTeam;
-                    switch (room.gameMode) {
+                  switch (room.gameMode) {
                         case "2tdm": {
                             // Count how many others there are
                             let census = [1, 1], scoreCensus = [1, 1];
                             players.forEach(p => { 
                                 census[p.team - 1]++; 
-                                if (p.body != null) { scoreCensus[p.team - 2] += p.body.skill.score; }
+                                if (p.body != null) { scoreCensus[p.team - 1] += p.body.skill.score; }
                             });
                             let possiblities = [];
                             for (let i=0, m=0; i<2; i++) {
+                                let v = Math.round(1000000 * (room['bas'+(i+1)].length + 1) / (census[i] + 1) / scoreCensus[i]);
+                                if (v > m) {
+                                    m = v; possiblities = [i];
+                                }
+                                else if (v == m) { possiblities.push(i); }
+                            }
+                            // Choose from one of the least ones
+                            if (player.team == null) { player.team = ran.choose(possiblities) + 1; }
+                            // Make sure you're in a base
+                            if (room['bas' + player.team].length) do { loc = room.randomType('bas' + player.team); } while (dirtyCheck(loc, 50));
+                            else do { loc = room.gaussInverse(5); } while (dirtyCheck(loc, 50));
+                        } break;
+                        case "3tdm": {
+                            // Count how many others there are
+                            let census = [1, 1, 1], scoreCensus = [1, 1, 1];
+                            players.forEach(p => { 
+                                census[p.team - 1]++; 
+                                if (p.body != null) { scoreCensus[p.team - 1] += p.body.skill.score; }
+                            });
+                            let possiblities = [];
+                            for (let i=0, m=0; i<3; i++) {
+                                let v = Math.round(1000000 * (room['bas'+(i+1)].length + 1) / (census[i] + 1) / scoreCensus[i]);
+                                if (v > m) {
+                                    m = v; possiblities = [i];
+                                }
+                                else if (v == m) { possiblities.push(i); }
+                            }
+                            // Choose from one of the least ones
+                            if (player.team == null) { player.team = ran.choose(possiblities) + 1; }
+                            // Make sure you're in a base
+                            if (room['bas' + player.team].length) do { loc = room.randomType('bas' + player.team); } while (dirtyCheck(loc, 50));
+                            else do { loc = room.gaussInverse(5); } while (dirtyCheck(loc, 50));
+                        } break;
+                        case "4tdm": {
+                            // Count how many others there are
+                            let census = [1, 1, 1, 1], scoreCensus = [1, 1, 1, 1];
+                            players.forEach(p => { 
+                                census[p.team - 1]++; 
+                                if (p.body != null) { scoreCensus[p.team - 1] += p.body.skill.score; }
+                            });
+                            let possiblities = [];
+                            for (let i=0, m=0; i<4; i++) {
                                 let v = Math.round(1000000 * (room['bas'+(i+1)].length + 1) / (census[i] + 1) / scoreCensus[i]);
                                 if (v > m) {
                                     m = v; possiblities = [i];
