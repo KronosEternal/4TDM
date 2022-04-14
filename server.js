@@ -70,7 +70,6 @@ let room = {
         room[type] = output;
     };
     room.findType('nest');
-    room.findType('wall');
     room.findType('norm');
     room.findType('bas1');
     room.findType('bas2');
@@ -2786,8 +2785,7 @@ class Entity {
             facing: this.facing,
             vfacing: this.vfacing,
             twiggle: this.facingType === 'autospin' || this.facingType === 'suspin',
-            layer: (this.bond != null) ? this.bound.layer : 
-                    (this.type === 'wall') ? 11 : 
+            layer: (this.bond != null) ? this.bound.layer :  
                     (this.type === 'food') ? 10 : 
                     (this.type === 'tank') ? 5 :
                     (this.type === 'crasher') ? 1 :
@@ -5716,21 +5714,6 @@ var maintainloop = (() => {
         util.log('Placing ' + count + ' obstacles!');
     }
     placeRoids();
-
-    let placeWalls = () => {
-      let count = 0
-      for (let loc of room['wall']) {
-        let o = new Entity(loc)
-        o.define(Class.mazeObstacle)
-        o.SIZE = (room.xgridWidth + room.ygridHeight) / 4
-        o.team = -101
-        o.protect()
-        o.life()
-        count++;
-      }
-      util.log('Placing ' + count + ' regular walls!')
-    }
-    placeWalls()
   // Spawning functions
 let spawnBosses = (() => {
         let wave = 1; //Define Wave.
