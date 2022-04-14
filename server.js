@@ -2857,7 +2857,7 @@ class Entity {
             this.maxSpeed = this.topSpeed;
             break;
         case "grow2":
-            this.SIZE += 15.53;
+            this.SIZE += 4.53;
             this.maxSpeed = this.topSpeed;
             break;
         case "shrink":
