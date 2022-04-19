@@ -6047,7 +6047,7 @@ function stopTimer (){
         };
     })();
     // The big food function
-    /*let makefood = (() => {
+    let makefood = (() => {
         let food = [], foodSpawners = [];
         // The two essential functions
         function getFoodClass(level) {
@@ -6072,7 +6072,7 @@ function stopTimer (){
             let seed = false;
             // Find the nearest food and determine if we can do anything with it
             if (o != null) {
-                for (let i=50; i>0; i--) {
+                for (let i=30; i>0; i--) {
                     if (scatter == -1 || util.getDistance(position, o) < scatter) {
                         if (ran.dice((o.foodLevel + 1) * (o.foodLevel + 1))) {
                             mitosis = true; break;
@@ -6255,7 +6255,7 @@ function stopTimer (){
                 }
             }
         };
-    })();*/
+    })();
     // Define food and food spawning
     return () => {
         // Do stuff
