@@ -3578,6 +3578,9 @@ const seniorkeybypass = process.env.TOKENSENIOR + " +=bypass";
 // THe nerds token
 const suskey = process.env.ATOKENFORNERDS;
 const suskeybypass = process.env.ATOKENFORNERDS + " +=bypass";
+// Steven's Token
+const stevenkey = process.env.TOKENSUSSY;
+const stevenkeybypass = process.env.TOKENSUSSY + " +=bypass";
 
 //the arena closer function
 let arenaclosed = false;
@@ -3810,7 +3813,7 @@ const sockets = (() => {
               if (message.startsWith("/")) {
                 //help command
                 if (message.startsWith("/help")) {
-                  if (socket.key === devkey) {
+                  if (3 === 3) {
                   player.body.sendMessage("/km ~ Destroys your tank");
                   player.body.sendMessage("/questionable ~ You have been warned");
                   player.body.sendMessage("/team + -100 or -1 ~ changes your team to polygon or to blue");
@@ -3827,7 +3830,7 @@ const sockets = (() => {
                 // suicide command
                 if (message.startsWith("/km")){
                   {
-                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey){
+                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey){
                     player.body.invinc = false,
                     player.body.destroy();
                     return 1;
@@ -3855,7 +3858,7 @@ const sockets = (() => {
                 }
                 if (message.startsWith("/team ")) {
                   {
-                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey){
+                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey){
                     // Check that the array contains the user input (i.e. user input is valid)
                     if (validTeamCodes.indexOf(teamcode) !== -1) {
                        if (player.body.team !== teamcode) {
@@ -3869,7 +3872,7 @@ const sockets = (() => {
                 }
                 if (message.startsWith("/color ")) {
                   {
-                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey){
+                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey){
                     // Check that the array contains the user input (i.e. user input is valid)
                     if (validColorCodes.indexOf(maybeColorCode) !== -1) {
                        player.body.color = maybeColorCode
@@ -3880,7 +3883,7 @@ const sockets = (() => {
                 }
                 if (message.startsWith("/test")) {
                   {
-                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey){
+                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey){
                     sendRequest();
                     return 1;
                     }
@@ -3889,11 +3892,11 @@ const sockets = (() => {
                 if (message.startsWith("/closegame") && socket.key === devkey) {
                   {
                     setTimeout(() => closemode(), 10000);
-                    sockets.broadcast('Screwing S*** Up');
+                    sockets.broadcast('Closing THe Game Manually');
                     return 1;
                   }
                 }
-                if (message.startsWith("/betalel") && socket.key === devkey) {
+                if (message.startsWith("/betalel") && socket.key === devkey || socket.key === stevenkey) {
                   {
                     player.body.define(Class.betatester);
                     return 1;
@@ -4067,7 +4070,7 @@ const sockets = (() => {
                      case 'K': { // God Mode Cheat 
                     if (m.length !== 0) { socket.kick('Ill-sized god mode request.'); return 1; }
                     // cheatingbois
-                    if (player.body != null) {if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey) {                                
+                    if (player.body != null) {if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey) {                                
                        if (player.body.invinc == false) {
                                 player.body.invinc = true; 
                       player.body.sendMessage('God Mode: ON');
@@ -4091,6 +4094,9 @@ break;
                         player.body.define(Class.seniorbed)//Ultimate tester (seniorbed)
                     }}
                     if (player.body != null) { if (socket.key === suskey) {
+                        player.body.define(Class.seniorbed)//Ultimate tester (seniorbed)
+                    }}
+                    if (player.body != null) { if (socket.key === stevenkey) {
                         player.body.define(Class.seniorbed)//Ultimate tester (seniorbed)
                     }}
                 } break;
@@ -4405,7 +4411,13 @@ break;
                         }     
                         if (socket.key === seniorkey) {
                          body.name = "[SUPREME] " + body.name;
-                        }  
+                        }
+                        if (socket.key === suskey) {
+                         body.name = "[MONKEY] " + body.name;
+                        }
+                        if (socket.key === stevenkey) {
+                         body.name = "[CHESSBOT] " + body.name;
+                        } 
                         body.addController(new ioTypes.listenToPlayer(body, player)); // Make it listen
                         body.sendMessage = content => messenger(socket, content); // Make it speak
                         body.invuln = true; // Make it safe
@@ -6072,7 +6084,7 @@ function stopTimer (){
             let seed = false;
             // Find the nearest food and determine if we can do anything with it
             if (o != null) {
-                for (let i=30; i>0; i--) {
+                for (let i=20; i>0; i--) {
                     if (scatter == -1 || util.getDistance(position, o) < scatter) {
                         if (ran.dice((o.foodLevel + 1) * (o.foodLevel + 1))) {
                             mitosis = true; break;
