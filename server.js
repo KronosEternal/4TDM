@@ -6084,7 +6084,7 @@ function stopTimer (){
             let seed = false;
             // Find the nearest food and determine if we can do anything with it
             if (o != null) {
-                for (let i=20; i>0; i--) {
+                for (let i=50; i>0; i--) {
                     if (scatter == -1 || util.getDistance(position, o) < scatter) {
                         if (ran.dice((o.foodLevel + 1) * (o.foodLevel + 1))) {
                             mitosis = true; break;
@@ -6223,9 +6223,9 @@ function stopTimer (){
             let maxNestFood = 1 + room.maxFood * room.nestFoodAmount;
             let foodAmount = census.sum;
             let nestFoodAmount = censusNest.sum;
-            //*********** ROT OLD SPAWNERS **********
+            /*********** ROT OLD SPAWNERS **********/
             foodSpawners.forEach(spawner => { if (ran.chance(1 - foodAmount/maxFood)) spawner.rot(); });
-            //************** MAKE FOOD **************
+            /************** MAKE FOOD **************/
             while (ran.chance(0.8 * (1 - foodAmount * foodAmount / maxFood / maxFood))) {
                 switch (ran.chooseChance(10, 2, 1)) {
                 case 0: makeGroupedFood(); break;
@@ -6234,7 +6234,7 @@ function stopTimer (){
                 }
             } 
             while (ran.chance(0.5 * (1 - nestFoodAmount * nestFoodAmount / maxNestFood / maxNestFood))) makeNestFood();
-            //************* UPGRADE FOOD ************
+            /************* UPGRADE FOOD ************/
             if (!food.length) return 0;
             for (let i=Math.ceil(food.length / 100); i>0; i--) {
                 let o = food[ran.irandom(food.length - 1)], // A random food instance
