@@ -1,7 +1,7 @@
 {
   "name": "Arras.io",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "nigeria.js",
   "scripts": {
     "start": "node server"
   },
