@@ -5787,8 +5787,7 @@ var maintainloop = (() => {
     }
     placeWalls()
   // Spawning functions
-let spawnBosses = (() => {
-        let wave = 1; //Define Wave.
+    let spawnBosses = (() => {
         let timer = 0;
         let boss = (() => {
             let i = 0,
@@ -5815,17 +5814,18 @@ let spawnBosses = (() => {
                     loc = typeOfLocation;
                     names = ran.chooseBossName(nameClass, number);
                     i = 0;
-                    if (n === 0) {
+                    if (n === 1) {
                         begin = 'A visitor is coming.';
                         arrival = names[0] + ' has arrived.'; 
                     } else {
-                        begin = 'Spawning..'
+                        begin = 'Visitors are coming.';
                         arrival = '';
-                        arrival += 'Wave ' + wave + ' has begun!'; //Say what wave was started
-                    } wave += 1;
+                        for (let i=0; i<n-2; i++) arrival += names[i] + ', ';
+                        arrival += names[n-2] + ' and ' + names[n-1] + ' have arrived.';
+                    }
                 },
                 spawn: () => {
-                    //sockets.broadcast(begin);
+                    sockets.broadcast(begin);
                     for (let i=0; i<n; i++) {
                         setTimeout(spawn, ran.randomRange(3500, 5000));
                     }
@@ -5836,18 +5836,29 @@ let spawnBosses = (() => {
             };
         })();
         return census => {
-            if (timer > 100 && ran.dice(110 - timer)) {
-                util.log('[SPAWN] Preparing to spawn...');
+            if (timer > 195 && ran.dice(160 - timer)) {
+                util.log('[SPAWN] Preparing to spawn...' + Class);
                 timer = 0;
                 let choice = [];
-                switch (wave) { //The wave contenders
-                   case 1: 
-                        choice = [[Class.anni], 1, 'a', 'nest'];
-                        sockets.broadcast('the next wave will start in 14 seconds');
+                switch (ran.chooseChance(1, 1, 1, 1)) {
+                    case 0: 
+                        choice = [[Class.elite_destroyer,Class.elite_sprayer,Class.elite_gunner, Class.elite_gunner,Class.elite_spawner], 1, 'a', 'bas3'];
                         break;
-  }
+                    case 1: 
+                        choice = [[Class.elite_destroyer,Class.elite_sprayer,Class.elite_battleship, Class.elite_gunner,Class.elite_spawner], 2, 'a', 'bas3'];
+                        break;
+                    case 2: 
+                        choice = [[Class.palisade,Class.summoner,Class.skimboss,Class.cyclone, Class.nestkeep], 1, 'a', 'bas3']; 
+                        sockets.broadcast('A strange trembling...');
+                        break;
+                    case 3: 
+                        choice = [[Class.palisade,Class.summoner,Class.skimboss,Class.cyclone, Class.nestkeep], 2, 'a', 'bas3']; 
+                        sockets.broadcast('A strange trembling...');
+                        break; 
+
+                }
                 boss.prepareToSpawn(...choice);
-                setTimeout(boss.spawn, 3000);
+                setTimeout(boss.spawn, 2000);
                 // Set the timeout for the spawn functions
             } else if (!census.miniboss) timer++;
         };
