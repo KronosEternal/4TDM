@@ -5836,23 +5836,23 @@ var maintainloop = (() => {
             };
         })();
         return census => {
-            if (timer > 195 && ran.dice(160 - timer)) {
+            if (timer > 90 && ran.dice(160 - timer)) {
                 util.log('[SPAWN] Preparing to spawn...' + Class);
                 timer = 0;
                 let choice = [];
                 switch (ran.chooseChance(1, 1, 1, 1)) {
                     case 0: 
-                        choice = [[Class.elite_destroyer,Class.elite_sprayer,Class.elite_gunner, Class.elite_gunner,Class.elite_spawner], 1, 'a', 'bas3'];
+                        choice = [[Class.elite_destroyer,Class.elite_sprayer,Class.elite_gunner, Class.elite_gunner,Class.elite_spawner], 1, 'a', 'nest'];
                         break;
                     case 1: 
-                        choice = [[Class.elite_destroyer,Class.elite_sprayer,Class.elite_battleship, Class.elite_gunner,Class.elite_spawner], 2, 'a', 'bas3'];
+                        choice = [[Class.elite_destroyer,Class.elite_sprayer,Class.elite_battleship, Class.elite_gunner,Class.elite_spawner], 2, 'a', 'nest'];
                         break;
                     case 2: 
-                        choice = [[Class.palisade,Class.summoner,Class.skimboss,Class.cyclone, Class.nestkeep], 1, 'a', 'bas3']; 
+                        choice = [[Class.palisade,Class.summoner,Class.skimboss,Class.cyclone, Class.nestkeep], 1, 'a', 'nest']; 
                         sockets.broadcast('A strange trembling...');
                         break;
                     case 3: 
-                        choice = [[Class.palisade,Class.summoner,Class.skimboss,Class.cyclone, Class.nestkeep], 2, 'a', 'bas3']; 
+                        choice = [[Class.palisade,Class.summoner,Class.skimboss,Class.cyclone, Class.nestkeep], 2, 'a', 'nest']; 
                         sockets.broadcast('A strange trembling...');
                         break; 
 
