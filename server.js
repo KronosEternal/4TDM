@@ -5866,95 +5866,16 @@ var maintainloop = (() => {
             } else if (!census.miniboss) timer++;
         };
     })();
-// Siege Boss Spawning (to be reworked) ^
-//working wave spawner -->
-  function Wavespawn(){
-    siegeSpawning();
-  }
-
-let siegeSpawning = (() => {
-    let wave = 1; //Define Wave
-    let timer = 0; //Time between waves
-    
-    let elite = 21;
-    let polygon = 21;
-    let celes = 21;
-    let final = 21;
-    let custom = 21;
-    
-  })();
-  ////////Timer function for arena losing
-  var sec_left = 60; //How long before team loses
-  var stopTime = 0;
-  var reset = true;
-
-function timeThing() {
-  var timer = setInterval(function(){
-  if (stopTime === 1){
-    clearInterval(timer);
-    stopTime = 0;
-  }
-  if(sec_left <= 0){
-    clearInterval(timer);
-    sockets.broadcast('Your Team has Lost')
-    if (arenaclosed === false) {
-    setTimeout(() => closemode(), 1e3);
-    }
-    reset = false;
-  } else {
-    if (sec_left === 50){
-      sockets.broadcast('your team will lose in 50 seconds')
-    }
-    if (sec_left === 40){
-      sockets.broadcast('your team will lose in 40 seconds')
-    }
-    if (sec_left === 30){
-      sockets.broadcast('your team will lose in 30 seconds')
-    }
-    if (sec_left === 20){
-      sockets.broadcast('your team will lose in 20 seconds')
-    }
-    if (sec_left === 10){
-      sockets.broadcast('your team will lose in 10 seconds')
-    }
-    if (sec_left === 9){
-      sockets.broadcast('your team will lose in 9 seconds')
-    }
-    if (sec_left === 8){
-      sockets.broadcast('your team will lose in 8 seconds')
-    }
-    if (sec_left === 7){
-      sockets.broadcast('your team will lose in 7 seconds')
-    }
-    if (sec_left === 6){
-      sockets.broadcast('your team will lose in 6 seconds')
-    }
-    if (sec_left === 5){
-      sockets.broadcast('your team will lose in 5 seconds')
-    }
-    if (sec_left === 4){
-      sockets.broadcast('your team will lose in 4 seconds')
-    }
-    if (sec_left === 3){
-      sockets.broadcast('your team will lose in 3 seconds')
-    }
-    if (sec_left === 2){
-      sockets.broadcast('your team will lose in 2 seconds')
-    }
-    if (sec_left === 1){
-      sockets.broadcast('your team will lose in 1 seconds')
-    }
-  }
-  sec_left -= 1;
-}, 1000);
-}
-
-function stopTimer (){
-  stopTime = 1;
-  if (reset === true){
-  sec_left = 60;
-  }
-}
+    let spawnCrasher = census => {
+        if (ran.chance(1 -  0.5 * census.crasher / room.maxFood / room.nestFoodAmount)) {
+            let spot, i = 30;
+            do { spot = room.randomType('nest'); i--; if (!i) return 0; } while (dirtyCheck(spot, 100));
+            let type = (ran.dice(80)) ? ran.choose([Class.sentryGun, Class.sentrySwarm, Class.sentryTrap]) : Class.crasher;
+            let o = new Entity(spot);
+                o.define(type);
+                o.team = -100;
+        }
+    };
 // The NPC function
     let makenpcs = (() => {
         // Return the spawning function
