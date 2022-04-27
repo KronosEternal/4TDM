@@ -66,11 +66,13 @@ const room = {
         room[type] = output;
     };
     room.findType('nest');
+    room.findType('wall');
     room.findType('norm');
     room.findType('bas1');
     room.findType('bas2');
     room.findType('bas3');
     room.findType('bas4');
+    room.findType('bas6');
     room.findType('roid');
     room.findType('rock');
     room.nestFoodAmount = 1.5 * Math.sqrt(room.nest.length) / room.xgrid / room.ygrid;
@@ -216,8 +218,8 @@ function timeOfImpact(p, v, s) {
 }
 class IO {
     constructor(body) {
-        this.body = body;
-        this.acceptsFromTop = true;
+        this.body = body
+        this.acceptsFromTop = true
     }
 
     think() {
@@ -228,13 +230,14 @@ class IO {
             main: null,
             alt: null,
             power: null,
-        };
+        }
     }
 }
-class io_doNothing extends IO {
+let ioTypes = {}
+ioTypes.doNothing = class extends IO {
     constructor(body) {
-        super(body);
-        this.acceptsFromTop = false;
+        super(body)
+        this.acceptsFromTop = false
     }
 
     think() {
@@ -246,198 +249,292 @@ class io_doNothing extends IO {
             main: false,
             alt: false,
             fire: false,
-        };
+        }
     }
 }
-class io_moveInCircles extends IO {
+ioTypes.moveInCircles = class extends IO {
     constructor(body) {
-        super(body);
-        this.acceptsFromTop = false;
-        this.timer = ran.irandom(10) + 3;
+        super(body)
+        this.acceptsFromTop = false
+        this.timer = ran.irandom(10) + 3
         this.goal = {
             x: this.body.x + 10*Math.cos(-this.body.facing),
             y: this.body.y + 10*Math.sin(-this.body.facing),
-        };
+        }
     }
 
     think() {
         if (!(this.timer--)) {
-            this.timer = 10;
+            this.timer = 10
             this.goal = {
                 x: this.body.x + 10*Math.cos(-this.body.facing),
                 y: this.body.y + 10*Math.sin(-this.body.facing),
-            };
+            }
         }
-        return { goal: this.goal };
+        return { goal: this.goal }
     }
 }
-class io_listenToPlayer extends IO {
+ioTypes.listenToPlayer = class extends IO {
     constructor(b, p) {
-        super(b);
-        this.player = p;
-        this.acceptsFromTop = false;
+        super(b)
+        this.player = p
+        this.acceptsFromTop = false
     }
 
     // THE PLAYER MUST HAVE A VALID COMMAND AND TARGET OBJECT
-    
+
     think() {
         let targ = {
             x: this.player.target.x,
             y: this.player.target.y,
-        };
+        }
+        if (c.RADIAL) {
+            let angle = Math.atan2(this.body.x - room.width / 2, room.height / 2 - this.body.y)
+            let cos = Math.cos(angle)
+            let sin = Math.sin(angle)
+            let { x, y } = targ
+            targ.x = cos * x - sin * y
+            targ.y = sin * x + cos * y
+        }
         if (this.player.command.autospin) {
-            let kk = Math.atan2(this.body.control.target.y, this.body.control.target.x) + 0.02;
+            let kk = Math.atan2(this.body.control.target.y, this.body.control.target.x) + 0.02
             targ = {
                 x: 100 * Math.cos(kk),
                 y: 100 * Math.sin(kk),
-            };
+            }
+        } else if (this.player.command.reverseTank) {
+            targ.x = -targ.x
+            targ.y = -targ.y
         }
         if (this.body.invuln) {
             if (this.player.command.right || this.player.command.left || this.player.command.up || this.player.command.down || this.player.command.lmb) {
-                this.body.invuln = false;
+                this.body.invuln = false
             }
         }
-        this.body.autoOverride = this.player.command.override;
-        return {         
+        this.body.autoOverride = this.player.command.override
+        let left = this.player.command.lmb
+        let right = this.player.command.rmb
+        if (this.player.command.reverseMouse) {
+            let temp = right
+            right = left
+            left = temp
+        }
+        left = this.player.command.autofire || left
+        let goalX = this.player.command.right - this.player.command.left
+        let goalY = this.player.command.down - this.player.command.up
+        if (c.RADIAL) {
+            let angle = Math.atan2(this.body.x - room.width / 2, room.height / 2 - this.body.y)
+            let cos = Math.cos(angle)
+            let sin = Math.sin(angle)
+            let newX = cos * goalX - sin * goalY
+            let newY = sin * goalX + cos * goalY
+            goalX = newX
+            goalY = newY
+        }
+        return {
             target: targ,
             goal: {
-                x: this.body.x + this.player.command.right - this.player.command.left,
-                y: this.body.y + this.player.command.down - this.player.command.up,
+                x: this.body.x + goalX,
+                y: this.body.y + goalY,
             },
-            fire: this.player.command.lmb || this.player.command.autofire,
-            main: this.player.command.lmb || this.player.command.autospin || this.player.command.autofire,
-            alt: this.player.command.rmb,
-        };
+            fire: left,
+            main: left || this.player.command.autospin,
+            alt: right,
+            reverseTank: this.player.command.reverseTank,
+        }
     }
 }
-class io_mapTargetToGoal extends IO {
+ioTypes.reactionControl = class extends IO {
     constructor(b) {
-        super(b);
+        super(b)
+        this.acceptsFromTop = false
+        this.direction = 0
+        this.stabilizeWait = 50
+    }
+
+    // THE PLAYER MUST HAVE A VALID COMMAND AND TARGET OBJECT
+
+    think() {
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        let player = this.body.master.master.player
+        let moving = player && (player.command.right || player.command.left || player.command.down || player.command.up)
+        let fire = moving
+        let override = this.body.master.autoOverride
+        if (moving) {
+          /*let x = this.body.master.control.goal.x - this.body.x // +player.command.right - +player.command.left
+          let y = this.body.master.control.goal.y - this.body.y // +player.command.down - +player.command.up
+          this.direction = Math.atan2(y, x)*/
+          let x = +player.command.right - +player.command.left
+          let y = +player.command.down - +player.command.up
+          this.direction = [
+            -3, -2, -1,
+             4,  0,  0,
+             3,  2,  1,
+          ][y * 3 + x + 4] / 4 * Math.PI
+          if (c.RADIAL) {
+            this.direction += Math.atan2(this.body.x - room.width / 2, room.height / 2 - this.body.y)
+          }
+        } else if (!override) {
+          if (!this.body.master.velocity.isShorterThan(0.1)) {
+            this.direction = this.body.master.velocity.direction + Math.PI
+            if (!this.body.master.velocity.isShorterThan(1.5) || this.stabilizeWait <= 0) {
+              fire = true
+            }
+          }
+        }
+        if (fire && !(this.stabilizeWait <= 0 && this.stabilizeWait > 3)) {
+          this.stabilizeWait = 50
+        } else if (this.stabilizeWait > 0) {
+          this.stabilizeWait--
+        }
+        return {
+            target: {
+                x: Math.cos(offset + this.direction),
+                y: Math.sin(offset + this.direction),
+            },
+            main: true,
+            fire,
+        }
+    }
+}
+ioTypes.mapTargetToGoal = class extends IO {
+    constructor(body) {
+        super(body)
     }
 
     think(input) {
         if (input.main || input.alt) {
-            return {         
+            return {
                 goal: {
                     x: input.target.x + this.body.x,
                     y: input.target.y + this.body.y,
                 },
                 power: 1,
-            };
+            }
         }
     }
 }
-class io_boomerang extends IO {
-    constructor(b) {
-        super(b);
-        this.r = 0;
-        this.b = b;
-        this.m = b.master;
-        this.turnover = false;
-        let len = 10 * util.getDistance({x: 0, y:0}, b.master.control.target);
+ioTypes.boomerang = class extends IO {
+    constructor(body) {
+        super(body)
+        this.range = 0
+        this.master = body.master
+        this.turnover = false
         this.myGoal = {
-            x: 3 * b.master.control.target.x + b.master.x,
-            y: 3 * b.master.control.target.y + b.master.y,
-        };
+            x: 3 * body.master.control.target.x + body.master.x,
+            y: 3 * body.master.control.target.y + body.master.y,
+        }
     }
     think(input) {
-        if (this.b.range > this.r) this.r = this.b.range;
-        let t = 1; //1 - Math.sin(2 * Math.PI * this.b.range / this.r) || 1;
-        if (!this.turnover) {
-            if (this.r && this.b.range < this.r * 0.5) { this.turnover = true; }
-            return {
-                goal: this.myGoal,
-                power: t,
-            };
-        } else {
+        if (this.body.range > this.range) this.range = this.body.range
+        if (this.turnover) {
             return {
                 goal: {
-                    x: this.m.x,
-                    y: this.m.y,
+                    x: this.master.x,
+                    y: this.master.y,
                 },
-                power: t,
-            };
+            }
+        } else {
+            if (this.range && this.body.range < this.range * 0.5) this.turnover = true
+            return {
+                goal: this.myGoal,
+            }
         }
     }
 }
-class io_goToMasterTarget extends IO {
+ioTypes.goToMasterTarget = class extends IO {
     constructor(body) {
-        super(body);
+        super(body)
         this.myGoal = {
             x: body.master.control.target.x + body.master.x,
             y: body.master.control.target.y + body.master.y,
-        };
-        this.countdown = 5;
+        }
+        this.countdown = 200
     }
 
     think() {
-        if (this.countdown) {
-            if (util.getDistance(this.body, this.myGoal) < 1) { this.countdown--; }
-            return {
-                goal: {
-                    x: this.myGoal.x,
-                    y: this.myGoal.y,
-                },
-            };
+        if (this.countdown <= 0) return
+
+        // projectedDistance = velocity / this.body.damp * roomSpeed
+        let deltaX = (this.myGoal.x - this.body.x) * this.body.damp - this.body.velocity.x
+        let deltaY = (this.myGoal.y - this.body.y) * this.body.damp - this.body.velocity.y
+        let power = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / this.body.acceleration / roomSpeed
+        if (power < 0.001)
+          this.countdown -= 20
+        else
+          this.countdown--
+
+        return {
+            goal: {
+                x: this.body.x + deltaX,
+                y: this.body.y + deltaY,
+            },
+            power: Math.min(1, power),
         }
     }
 }
-class io_canRepel extends IO {
-    constructor(b) {
-        super(b);
+ioTypes.canRepel = class extends IO {
+    constructor(body) {
+        super(body)
     }
-    
+
     think(input) {
         if (input.alt && input.target) {
-            return {                
-                target: {
-                    x: -input.target.x,
-                    y: -input.target.y,
-                },  
-                main: true,
-            };
+            let x = this.body.master.master.x - this.body.x
+            let y = this.body.master.master.y - this.body.y
+            // if (x * x + y * y < 2250000) // (50 * 30) ^ 2
+            return {
+              target: {
+                x: -input.target.x,
+                y: -input.target.y,
+              },
+              main: true,
+            }
         }
     }
 }
-class io_alwaysFire extends IO {
+ioTypes.alwaysFire = class extends IO {
     constructor(body) {
-        super(body);
+        super(body)
     }
 
     think() {
         return {
             fire: true,
-        };
+        }
     }
 }
-class io_targetSelf extends IO {
+ioTypes.targetSelf = class extends IO {
     constructor(body) {
-        super(body);
+        super(body)
     }
 
     think() {
         return {
             main: true,
             target: { x: 0, y: 0, },
-        };
+        }
     }
 }
-class io_mapAltToFire extends IO {
+ioTypes.mapAltToFire = class extends IO {
     constructor(body) {
-        super(body);
+        super(body)
     }
 
     think(input) {
         if (input.alt) {
             return {
                 fire: true,
-            };
+            }
         }
     }
 }
-class io_onlyAcceptInArc extends IO {
+ioTypes.onlyAcceptInArc = class extends IO {
     constructor(body) {
-        super(body);
+        super(body)
     }
 
     think(input) {
@@ -447,125 +544,135 @@ class io_onlyAcceptInArc extends IO {
                     fire: false,
                     alt: false,
                     main: false,
-                };
+                }
             }
         }
     }
 }
-class io_nearestDifferentMaster extends IO {
+ioTypes.nearestDifferentMaster = class extends IO {
     constructor(body) {
-        super(body);
-        this.targetLock = undefined;
-        this.tick = ran.irandom(30);
-        this.lead = 0;
-        this.validTargets = this.buildList(body.fov / 2);
-        this.oldHealth = body.health.display();
+        super(body)
+        this.targetLock = undefined
+        this.tick = ran.irandom(30)
+        this.lead = 0
+        this.validTargets = this.buildList(body.fov)
     }
-
     buildList(range) {
         // Establish whom we judge in reference to
         let m = { x: this.body.x, y: this.body.y, },
             mm = { x: this.body.master.master.x, y: this.body.master.master.y, },
             mostDangerous = 0,
             sqrRange = range * range,
-            keepTarget = false;
+            sqrRangeMaster = range * range * 4/3,
+            keepTarget = false
         // Filter through everybody...
-        let out = entities.map(e => {
-            // Only look at those within our view, and our parent's view, not dead, not our kind, not a bullet/trap/block etc
-            if (e.health.amount > 0) {
-            if (!e.invuln) {
-            if (e.master.master.team !== this.body.master.master.team) {
-            if (e.master.master.team !== -101) {
-            if (e.type === 'tank' || e.type === 'crasher' || (!this.body.aiSettings.shapefriend && e.type === 'food')) {
-            if (Math.abs(e.x - m.x) < range && Math.abs(e.y - m.y) < range) {
-            if (!this.body.aiSettings.blind || (Math.abs(e.x - mm.x) < range && Math.abs(e.y - mm.y) < range)) return e;
-            } } } } } }
-        }).filter((e) => { return e; });
-        
-        if (!out.length) return [];
-
-        out = out.map((e) => {
+        let out = entities.filter(e => {
+          // Only look at those within our view, and our parent's view, not dead, not invisible, not our kind, not a bullet/trap/block etc
+          return (e.health.amount > 0) &&
+                 (!e.invuln) &&
+                 (e.master.master.team !== this.body.master.master.team) &&
+                 (e.master.master.team !== -101) &&
+                 (e.master.master.alpha > 0.5) &&
+                 (e.type === 'tank' || e.type === 'crasher' || (!this.body.aiSettings.fixedFriend && e.type === 'fixed') || (!this.body.aiSettings.shapeFriend && e.type === 'food')) &&
+                 (this.body.aiSettings.parentView  || ((e.x -  m.x) * (e.x -  m.x) < sqrRange && (e.y -  m.y) * (e.y -  m.y) < sqrRange)) &&
+                 (this.body.aiSettings.skynet      || ((e.x - mm.x) * (e.x - mm.x) < sqrRangeMaster && (e.y - mm.y) * (e.y - mm.y) < sqrRangeMaster)) &&
+                 (!this.body.aiSettings.ignoreBase || room.isNotInBase(e))
+        }).filter((e) => {
             // Only look at those within range and arc (more expensive, so we only do it on the few)
-            let yaboi = false;
-            if (Math.pow(this.body.x - e.x, 2) + Math.pow(this.body.y - e.y, 2) < sqrRange) {
-                if (this.body.firingArc == null || this.body.aiSettings.view360) {
-                    yaboi = true;
-                } else if (Math.abs(util.angleDifference(util.getDirection(this.body, e), this.body.firingArc[0])) < this.body.firingArc[1]) yaboi = true;
-            }
-            if (yaboi) {                
-                mostDangerous = Math.max(e.dangerValue, mostDangerous);
-                return e;
-            }
-        }).filter((e) => { 
-            // Only return the highest tier of danger
-            if (e != null) { if (this.body.aiSettings.farm || e.dangerValue === mostDangerous) { 
-                if (this.targetLock) { if (e.id === this.targetLock.id) keepTarget = true; }
-                return e; 
-            } } 
-        }); 
+          if (this.body.firingArc == null || this.body.aiSettings.view360 ||
+            Math.abs(util.angleDifference(util.getDirection(this.body, e), this.body.firingArc[0])) < this.body.firingArc[1]) {
+            mostDangerous = Math.max(e.dangerValue, mostDangerous)
+            return true
+          }
+          return false
+        }).filter((e) => {
+          // Only return the highest tier of danger
+          if (this.body.aiSettings.farm || e.dangerValue === mostDangerous) {
+            if (this.targetLock && e.id === this.targetLock.id) keepTarget = true
+            return true
+          }
+          return false
+        });
         // Reset target if it's not in there
-        if (!keepTarget) this.targetLock = undefined;
-        return out;
+        if (!keepTarget) this.targetLock = undefined
+        return out
     }
 
     think(input) {
+        if (this.body.alpha < 0.5) return {}
         // Override target lock upon other commands
         if (input.main || input.alt || this.body.master.autoOverride) {
-            this.targetLock = undefined; return {};
-        } 
+            this.targetLock = undefined; return {}
+        }
         // Otherwise, consider how fast we can either move to ram it or shoot at a potiential target.
         let tracking = this.body.topSpeed,
-            range = this.body.fov / 2;
+            range = this.body.fov
         // Use whether we have functional guns to decide
         for (let i=0; i<this.body.guns.length; i++) {
-            if (this.body.guns[i].canShoot && !this.body.aiSettings.skynet) {
-                let v = this.body.guns[i].getTracking();
-                tracking = v.speed;
-                range = Math.min(range, v.speed * v.range);
-                break;
+            if (this.body.guns[i].canShoot) {
+                let v = this.body.guns[i].getTracking()
+                tracking = v.speed
+                range = Math.min(range, v.speed * v.range)
+                break
             }
         }
         // Check if my target's alive
-        if (this.targetLock) { if (this.targetLock.health.amount <= 0) {
-            this.targetLock = undefined;
-            this.tick = 100;
-        } }
+        if (this.targetLock) {
+          let m = { x: this.body.x, y: this.body.y, },
+              mm = { x: this.body.master.master.x, y: this.body.master.master.y, },
+              sqrRange = range * range,
+              sqrRangeMaster = range * range * 4/3,
+              e = this.targetLock
+          if ((e.health.amount > 0) &&
+             (!e.invuln) &&
+             (e.master.master.team !== this.body.master.master.team) &&
+             (e.master.master.team !== -101) &&
+             (e.alpha > 0.5) &&
+             (e.type === 'tank' || e.type === 'crasher' || (!this.body.aiSettings.fixedFriend && e.type === 'fixed') || (!this.body.aiSettings.shapeFriend && e.type === 'food')) &&
+             (this.body.aiSettings.parentView  || ((e.x -  m.x) * (e.x -  m.x) < sqrRange && (e.y -  m.y) * (e.y -  m.y) < sqrRange)) &&
+             (this.body.aiSettings.skynet      || ((e.x - mm.x) * (e.x - mm.x) < sqrRangeMaster && (e.y - mm.y) * (e.y - mm.y) < sqrRangeMaster)) &&
+             (!this.body.aiSettings.ignoreBase || room.isNotInBase(e))) {
+          } else {
+            this.targetLock = undefined
+            this.tick = 100
+          }
+        }
         // Think damn hard
         if (this.tick++ > 15 * roomSpeed) {
-            this.tick = 0;
-            this.validTargets = this.buildList(range);
+            this.tick = 0
+            this.validTargets = this.buildList(range)
             // Ditch our old target if it's invalid
             if (this.targetLock && this.validTargets.indexOf(this.targetLock) === -1) {
-                this.targetLock = undefined;
+                this.targetLock = undefined
             }
             // Lock new target if we still don't have one.
             if (this.targetLock == null && this.validTargets.length) {
-                this.targetLock = (this.validTargets.length === 1) ? this.validTargets[0] : nearest(this.validTargets, { x: this.body.x, y: this.body.y });
-                this.tick = -90;
+                this.targetLock = (this.validTargets.length === 1) ? this.validTargets[0] : nearest(this.validTargets, { x: this.body.x, y: this.body.y })
+                this.tick = -90
             }
         }
         // Lock onto whoever's shooting me.
-        // let damageRef = (this.body.bond == null) ? this.body : this.body.bond;
+        // let damageRef = (this.body.bond == null) ? this.body : this.body.bond
         // if (damageRef.collisionArray.length && damageRef.health.display() < this.oldHealth) {
-        //     this.oldHealth = damageRef.health.display();
+        //     this.oldHealth = damageRef.health.display()
         //     if (this.validTargets.indexOf(damageRef.collisionArray[0]) === -1) {
-        //         this.targetLock = (damageRef.collisionArray[0].master.id === -1) ? damageRef.collisionArray[0].source : damageRef.collisionArray[0].master;
+        //         this.targetLock = (damageRef.collisionArray[0].master.id === -1) ? damageRef.collisionArray[0].source : damageRef.collisionArray[0].master
         //     }
         // }
         // Consider how fast it's moving and shoot at it
         if (this.targetLock != null) {
-            let radial = this.targetLock.velocity;
+            let radial = this.targetLock.velocity
             let diff = {
                 x: this.targetLock.x - this.body.x,
                 y: this.targetLock.y - this.body.y,
-            };
-            /// Refresh lead time
+            }
+            // Refresh lead time
             if (this.tick % 4 === 0) {
-                this.lead = 0;
+                this.lead = 0
                 // Find lead time (or don't)
                 if (!this.body.aiSettings.chase) {
-                    let toi = timeOfImpact(diff, radial, tracking);
-                    this.lead = toi;
+                    let toi = timeOfImpact(diff, radial, tracking)
+                    this.lead = toi
                 }
             }
             // And return our aim
@@ -576,122 +683,233 @@ class io_nearestDifferentMaster extends IO {
                 },
                 fire: true,
                 main: true,
-            }; 
+            }
         }
-        return {};
+        return {}
     }
 }
-class io_avoid extends IO {
+ioTypes.avoid = class extends IO {
     constructor(body) {
-        super(body);
+        super(body)
     }
 
     think(input) {
-        let masterId = this.body.master.id;
-        let range = this.body.size * this.body.size * 100 ;
-        this.avoid = nearest( 
-            entities, 
+        let masterId = this.body.master.id
+        let range = this.body.size * this.body.size * 100
+        this.avoid = nearest(
+            entities,
             { x: this.body.x, y: this.body.y },
-            function(test, sqrdst) { 
+            function(test, sqrdst) {
                 return (
-                    test.master.id !== masterId && 
+                    test.master.id !== masterId &&
                     (test.type === 'bullet' || test.type === 'drone' || test.type === 'swarm' || test.type === 'trap' || test.type === 'block') &&
                     sqrdst < range
                 ); }
-        );
+        )
         // Aim at that target
-        if (this.avoid != null) { 
+        if (this.avoid != null) {
             // Consider how fast it's moving.
-            let delt = new Vector(this.body.velocity.x - this.avoid.velocity.x, this.body.velocity.y - this.avoid.velocity.y);
-            let diff = new Vector(this.avoid.x - this.body.x, this.avoid.y - this.body.y);            
-            let comp = (delt.x * diff. x + delt.y * diff.y) / delt.length / diff.length;
-            let goal = {};
+            let delt = new Vector(this.body.velocity.x - this.avoid.velocity.x, this.body.velocity.y - this.avoid.velocity.y)
+            let diff = new Vector(this.avoid.x - this.body.x, this.avoid.y - this.body.y);
+            let comp = (delt.x * diff. x + delt.y * diff.y) / delt.length / diff.length
+            let goal = {}
             if (comp > 0) {
                 if (input.goal) {
-                    let goalDist = Math.sqrt(range / (input.goal.x * input.goal.x + input.goal.y * input.goal.y));
+                    let goalDist = Math.sqrt(range / (input.goal.x * input.goal.x + input.goal.y * input.goal.y))
                     goal = {
                         x: input.goal.x * goalDist - diff.x * comp,
                         y: input.goal.y * goalDist - diff.y * comp,
-                    };
+                    }
                 } else {
                     goal = {
                         x: -diff.x * comp,
                         y: -diff.y * comp,
-                    };
+                    }
                 }
-                return goal;
+                return goal
             }
         }
     }
 }
-class io_minion extends IO {
+ioTypes.minion = class extends IO {
     constructor(body) {
-        super(body);
-        this.turnwise = 1;
+        super(body)
+        this.turnwise = 1
     }
 
     think(input) {
         if (this.body.aiSettings.reverseDirection && ran.chance(0.005)) { this.turnwise = -1 * this.turnwise; }
         if (input.target != null && (input.alt || input.main)) {
-            let sizeFactor = Math.sqrt(this.body.master.size / this.body.master.SIZE);
-            let leash = 60 * sizeFactor;
-            let orbit = 120 * sizeFactor;
-            let repel = 135 * sizeFactor;
-            let goal;
-            let power = 1;
-            let target = new Vector(input.target.x, input.target.y);
+            let sizeFactor = Math.sqrt(this.body.master.size / this.body.master.SIZE)
+            let leash = 82 * sizeFactor
+            let orbit = 140 * sizeFactor
+            let repel = 142 * sizeFactor
+            let goal
+            let power = 1
+            let target = new Vector(input.target.x, input.target.y)
             if (input.alt) {
                 // Leash
                 if (target.length < leash) {
                     goal = {
                         x: this.body.x + target.x,
                         y: this.body.y + target.y,
-                    };
+                    }
                 // Spiral repel
                 } else if (target.length < repel) {
-                    let dir = -this.turnwise * target.direction + Math.PI / 5;
+                    let dir = -this.turnwise * target.direction + Math.PI / 5
                     goal = {
                         x: this.body.x + Math.cos(dir),
                         y: this.body.y + Math.sin(dir),
-                    };
+                    }
                 // Free repel
                 } else {
                     goal = {
                         x: this.body.x - target.x,
                         y: this.body.y - target.y,
-                    };
+                    }
                 }
             } else if (input.main) {
                 // Orbit point
-                let dir = this.turnwise * target.direction + 0.01;
+                let dir = this.turnwise * target.direction + 0.01
                 goal = {
                     x: this.body.x + target.x - orbit * Math.cos(dir),
-                    y: this.body.y + target.y - orbit * Math.sin(dir), 
-                };
+                    y: this.body.y + target.y - orbit * Math.sin(dir),
+                }
                 if (Math.abs(target.length - orbit) < this.body.size * 2) {
-                    power = 0.7;
+                    power = 0.7
                 }
             }
-            return { 
+            return {
                 goal: goal,
                 power: power,
-            };
+            }
         }
     }
 }
-class io_hangOutNearMaster extends IO {
+ioTypes.orbitsupermassive = class extends IO {
     constructor(body) {
-        super(body);
-        this.acceptsFromTop = false;
-        this.orbit = 30;
-        this.currentGoal = { x: this.body.source.x, y: this.body.source.y, };
-        this.timer = 0;
+        super(body)
+        this.turnwise = 1
+    }
+
+    think(input) {
+        if (this.body.aiSettings.reverseDirection && ran.chance(0.005)) { this.turnwise = -1 * this.turnwise; }
+        if (input.target != null && (input.alt || input.main)) {
+            let sizeFactor = Math.sqrt(this.body.master.size / this.body.master.SIZE)
+            let leash = 82 * sizeFactor
+            let orbit = 270 * sizeFactor
+            let repel = 142 * sizeFactor
+            let goal
+            let power = 1
+            let target = new Vector(input.target.x, input.target.y)
+            if (input.alt) {
+                // Leash
+                if (target.length < leash) {
+                    goal = {
+                        x: this.body.x + target.x,
+                        y: this.body.y + target.y,
+                    }
+                // Spiral repel
+                } else if (target.length < repel) {
+                    let dir = -this.turnwise * target.direction + Math.PI / 5
+                    goal = {
+                        x: this.body.x + Math.cos(dir),
+                        y: this.body.y + Math.sin(dir),
+                    }
+                // Free repel
+                } else {
+                    goal = {
+                        x: this.body.x - target.x,
+                        y: this.body.y - target.y,
+                    }
+                }
+            } else if (input.main) {
+                // Orbit point
+                let dir = this.turnwise * target.direction + 0.01
+                goal = {
+                    x: this.body.x + target.x - orbit * Math.cos(dir),
+                    y: this.body.y + target.y - orbit * Math.sin(dir),
+                }
+                if (Math.abs(target.length - orbit) < this.body.size * 2) {
+                    power = 0.7
+                }
+            }
+            return {
+                goal: goal,
+                power: power,
+            }
+        }
+    }
+}
+ioTypes.orbitveryverylarge = class extends IO {
+    constructor(body) {
+        super(body)
+        this.turnwise = 1
+    }
+
+    think(input) {
+        if (this.body.aiSettings.reverseDirection && ran.chance(0.005)) { this.turnwise = -1 * this.turnwise; }
+        if (input.target != null && (input.alt || input.main)) {
+            let sizeFactor = Math.sqrt(this.body.master.size / this.body.master.SIZE)
+            let leash = 82 * sizeFactor
+            let orbit = 345 * sizeFactor
+            let repel = 142 * sizeFactor
+            let goal
+            let power = 1
+            let target = new Vector(input.target.x, input.target.y)
+            if (input.alt) {
+                // Leash
+                if (target.length < leash) {
+                    goal = {
+                        x: this.body.x + target.x,
+                        y: this.body.y + target.y,
+                    }
+                // Spiral repel
+                } else if (target.length < repel) {
+                    let dir = -this.turnwise * target.direction + Math.PI / 5
+                    goal = {
+                        x: this.body.x + Math.cos(dir),
+                        y: this.body.y + Math.sin(dir),
+                    }
+                // Free repel
+                } else {
+                    goal = {
+                        x: this.body.x - target.x,
+                        y: this.body.y - target.y,
+                    }
+                }
+            } else if (input.main) {
+                // Orbit point
+                let dir = this.turnwise * target.direction + 0.01
+                goal = {
+                    x: this.body.x + target.x - orbit * Math.cos(dir),
+                    y: this.body.y + target.y - orbit * Math.sin(dir),
+                }
+                if (Math.abs(target.length - orbit) < this.body.size * 2) {
+                    power = 0.7
+                }
+            }
+            return {
+                goal: goal,
+                power: power,
+            }
+        }
+    }
+}
+ioTypes.hangOutNearMaster = class extends IO {
+    constructor(body) {
+        super(body)
+        this.acceptsFromTop = false
+        this.orbit = 30
+        this.currentGoal = { x: this.body.source.x, y: this.body.source.y, }
+        this.timer = 0
     }
     think(input) {
-        if (this.body.source != this.body) {
-            let bound1 = this.orbit * 0.8 + this.body.source.size + this.body.size;
-            let bound2 = this.orbit * 1.5 + this.body.source.size + this.body.size;
-            let dist = util.getDistance(this.body, this.body.source) + Math.PI / 8; 
+        if (this.body.invisible[1]) return {}
+        if (this.body.source !== this.body) {
+            let bound1 = this.orbit * 0.8 + this.body.source.size + this.body.size
+            let bound2 = this.orbit * 1.5 + this.body.source.size + this.body.size
+            let dist = util.getDistance(this.body, this.body.source) + Math.PI / 8;
             let output = {
                 target: {
                     x: this.body.velocity.x,
@@ -699,112 +917,554 @@ class io_hangOutNearMaster extends IO {
                 },
                 goal: this.currentGoal,
                 power: undefined,
-            };        
+            };
             // Set a goal
             if (dist > bound2 || this.timer > 30) {
-                this.timer = 0;
+                this.timer = 0
 
-                let dir = util.getDirection(this.body, this.body.source) + Math.PI * ran.random(0.5); 
-                let len = ran.randomRange(bound1, bound2);
-                let x = this.body.source.x - len * Math.cos(dir);
-                let y = this.body.source.y - len * Math.sin(dir);
+                let dir = util.getDirection(this.body, this.body.source) + Math.PI * ran.random(0.5);
+                let len = ran.randomRange(bound1, bound2)
+                let x = this.body.source.x - len * Math.cos(dir)
+                let y = this.body.source.y - len * Math.sin(dir)
                 this.currentGoal = {
                     x: x,
                     y: y,
-                };        
+                };
             }
             if (dist < bound2) {
-                output.power = 0.15;
+                output.power = 0.15
                 if (ran.chance(0.3)) { this.timer++; }
             }
-            return output;
+            return output
         }
     }
 }
-class io_spin extends IO {
-    constructor(b) {
-        super(b);
-        this.a = 0;
+ioTypes.beltRockAction = class extends IO {
+    constructor(body) {
+        super(body)
+        this.acceptsFromTop = false
+        this.orbit = 30
+        this.currentGoal = { x: this.body.source.x, y: this.body.source.y, }
+        this.timer = 0
     }
-    
     think(input) {
-        this.a += 0.05;
-        let offset = 0;
-        if (this.body.bond != null) {
-            offset = this.body.bound.angle;
+        if (this.body.invisible[1]) return {}
+        if (this.body.source !== this.body) {
+            let bound1 = this.orbit * 0.8 + this.body.source.size + this.body.size
+            let bound2 = this.orbit * 1.5 + this.body.source.size + this.body.size
+            let dist = util.getDistance(this.body, this.body.source) + Math.PI / 8;
+            let output = {
+                target: {
+                    x: this.body.velocity.x,
+                    y: this.body.velocity.y,
+                },
+                goal: this.currentGoal,
+                power: undefined,
+            };
+            // Set a goal
+            if (dist > bound2 || this.timer > 30) {
+                this.timer = 0
+
+                let dir = util.getDirection(this.body, this.body.source) + Math.PI * ran.random(0.5);
+                let len = ran.randomRange(bound1, bound2)
+                let x = this.body.source.x - len * Math.cos(dir)
+                let y = this.body.source.y - len * Math.sin(dir)
+                this.currentGoal = {
+                    x: x,
+                    y: y,
+                };
+            }
+            if (dist < bound2) {
+                output.power = 0.15
+                if (ran.chance(0.3)) { this.timer++; }
+            }
+            return output
         }
-        return {                
+    }
+}
+ioTypes.spinWhenIdle = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        if (input.target) {
+          this.a = Math.atan2(input.target.y, input.target.x)
+          return input
+        }
+        this.a += 0.02
+        return {
+          target: {
+            x: Math.cos(this.a),
+            y: Math.sin(this.a),
+          },
+          main: true
+        }
+    }
+}
+ioTypes.slowspin = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.02
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
             target: {
                 x: Math.cos(this.a + offset),
                 y: Math.sin(this.a + offset),
-            },  
+            },
             main: true,
-        };        
+        };
     }
 }
-class io_fastspin extends IO {
-    constructor(b) {
-        super(b);
-        this.a = 0;
+ioTypes.spin = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
     }
-    
+
     think(input) {
-        this.a += 0.072;
-        let offset = 0;
+        this.a += 0.04
+        let offset = 0
         if (this.body.bond != null) {
-            offset = this.body.bound.angle;
+            offset = this.body.bound.angle
         }
-        return {                
+        return {
             target: {
                 x: Math.cos(this.a + offset),
                 y: Math.sin(this.a + offset),
-            },  
+            },
             main: true,
-        };        
+        };
     }
 }
-class io_reversespin extends IO {
-    constructor(b) {
-        super(b);
-        this.a = 0;
+ioTypes.spindef = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
     }
-    
+
     think(input) {
-        this.a -= 0.05;
-        let offset = 0;
+        this.a += 0.01
+        let offset = 0
         if (this.body.bond != null) {
-            offset = this.body.bound.angle;
+            offset = this.body.bound.angle
         }
-        return {                
+        return {
             target: {
                 x: Math.cos(this.a + offset),
                 y: Math.sin(this.a + offset),
-            },  
+            },
             main: true,
-        };        
+        };
     }
 }
-class io_dontTurn extends IO {
-    constructor(b) {
-        super(b);
+ioTypes.spinceles = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
     }
-    
+
+    think(input) {
+        this.a += 0.02
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+/*
+\\
+\\\
+\\\\
+\\\\\  Orbit Speeds for Solar System Testing
+/////
+////
+///
+//
+*/
+ioTypes.spinbelt1 = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.025
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinbelt2 = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a -= 0.013
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinmercury = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.07
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinvenus = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.05
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinearth = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.04
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinmars = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.032
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinjupiter = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.023
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinsaturn = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.01
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinuranus = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.008
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.spinneptune = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.006
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+/*
+\\
+\\\
+\\\\
+\\\\\
+///// Orbit Speeds for Solar System Testing
+////
+///
+//
+*/
+ioTypes.fastspin = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.08
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.counterslowspin = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a -= 0.02
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.lmg = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        if (!input.main) {
+          this.a = 0
+          return {}
+        }
+        this.a++
+        let offset = Math.atan2(this.body.master.y, this.body.master.x)
+        return {
+            target: {
+                x: Math.cos(offset - this.a * 0.12),
+                y: Math.sin(offset - this.a * 0.12),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.teaming = class extends IO { // AFT
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a += 0.4
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.reversespin = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a -= 0.05
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.reverseceles = class extends IO {
+    constructor(body) {
+        super(body)
+        this.a = 0
+    }
+
+    think(input) {
+        this.a -= 0.025
+        let offset = 0
+        if (this.body.bond != null) {
+            offset = this.body.bound.angle
+        }
+        return {
+            target: {
+                x: Math.cos(this.a + offset),
+                y: Math.sin(this.a + offset),
+            },
+            main: true,
+        };
+    }
+}
+ioTypes.dontTurn = class extends IO {
+    constructor(body) {
+        super(body)
+    }
+
     think(input) {
         return {
             target: {
-                x: 1,
-                y: 0,
-            },  
+                x: 0,
+                y: 1,
+            },
             main: true,
-        };        
+        };
     }
 }
-class io_fleeAtLowHealth extends IO {
-    constructor(b) {
-        super(b);
-        this.fear = util.clamp(ran.gauss(0.7, 0.15), 0.1, 0.9);
+ioTypes.fleeAtLowHealth = class extends IO {
+    constructor(body) {
+        super(body)
+        this.fear = util.clamp(ran.gauss(0.7, 0.15), 0.1, 0.9)
     }
-    
+
     think(input) {
         if (input.fire && input.target != null && this.body.health.amount < this.body.health.max * this.fear) {
             return {
@@ -812,12 +1472,10 @@ class io_fleeAtLowHealth extends IO {
                     x: this.body.x - input.target.x,
                     y: this.body.y - input.target.y,
                 },
-            };
+            }
         }
     }
-
 }
-
 /***** ENTITIES *****/
 // Define skills
 const skcnv = {
@@ -1713,7 +2371,7 @@ class Entity {
         if (set.CONTROLLERS != null) { 
             let toAdd = [];
             set.CONTROLLERS.forEach((ioName) => {
-                toAdd.push(eval('new io_' + ioName + '(this)'));
+                toAdd.push(new ioTypes[ioName](this))
             });
             this.addController(toAdd);
         }
@@ -2119,7 +2777,39 @@ class Entity {
             this.maxSpeed = this.topSpeed;
             this.damp = 0.05;
             break;
+        case "grow":
+            this.SIZE5 += 1.34;
+            this.maxSpeed = this.topSpeed;
+            break;
+        case "grow2":
+            this.SIZE += 4.53;
+            this.maxSpeed = this.topSpeed;
+            break;
+        case "shrink":
+            if (this.SIZE > 1) { //Make sure minimum size is 1 to prevent errors :)
+            this.SIZE -= 1.3;
+            this.maxSpeed = this.topSpeed;
+            }
+            break;
+        case "healer":
+            this.team = -100;
+            this.maxSpeed = this.topSpeed;
+            break;
         case 'motor':
+            this.maxSpeed = 0;            
+            if (this.topSpeed) {
+                this.damp = a / this.topSpeed;
+            }
+            if (gactive) {
+                let len = Math.sqrt(g.x * g.x + g.y * g.y);
+                engine = {
+                    x: a * g.x / len,
+                    y: a * g.y / len,
+                };
+            }
+            break;
+            case 'DEV':
+            this.name = " X: " + Math.floor(this.x) + " Y: " + Math.floor(this.y);
             this.maxSpeed = 0;            
             if (this.topSpeed) {
                 this.damp = a / this.topSpeed;
@@ -2191,7 +2881,6 @@ class Entity {
         this.accel.x += engine.x * this.control.power;
         this.accel.y += engine.y * this.control.power;
     }
-
     face() {
         let t = this.control.target,
             tactive = (t.x !== 0 || t.y !== 0),
@@ -2210,12 +2899,19 @@ class Entity {
         case 'looseWithMotion':
             this.facing += util.loopSmooth(this.facing, this.velocity.direction, 4 / roomSpeed); 
             break;
+        case 'smoothcum':
+            this.color = 6;
+            this.facing += util.loopSmooth(this.facing, this.velocity.direction, 4 / roomSpeed); 
+            break;
+        case 'teamer':
+            this.facing += 3.34 / roomSpeed;
+            break;
         case 'withTarget': 
         case 'toTarget': 
             this.facing = Math.atan2(t.y, t.x);
             break; 
-        case 'locksFacing': 
-            if (!this.control.alt) this.facing = Math.atan2(t.y, t.x);
+        case 'suspin': 
+            this.facing -= 0.05 / roomSpeed;
             break;
         case 'looseWithTarget':
         case 'looseToTarget':
@@ -2819,7 +3515,7 @@ const sockets = (() => {
                         player.body.invuln = false;
                         setTimeout(() => {
                             player.body.kill();
-                        }, 10000);
+                        }, 1000);
                     }
                     // Disconnect everything
                     util.log('[INFO] User ' + player.name + ' disconnected!');
@@ -2834,7 +3530,7 @@ const sockets = (() => {
                 util.log('[INFO] Socket closed. Views: ' + views.length + '. Clients: ' + clients.length + '.');
             }
             // Being kicked 
-            function kick(socket, reason = 'No reason given.') {
+            function kick(socket, reason = 'Error.') {
                 util.warn(reason + ' Kicking.');
                 socket.lastWords('K');
             }
@@ -2886,6 +3582,183 @@ const sockets = (() => {
                         socket.lastWords('w', false);
                     }*/
                 } break;
+                               case "h":
+            if (!socket.status.deceased) {
+              // Chat system!!.
+
+              let message = m[0];
+              let maxLen = 100;
+              let args = message.split(" ");
+              const restOfCommand = message.replace("/team ", "").trim();
+              const restOfMessage = message.replace("/color ", "").trim();
+              const teamcode = +restOfCommand
+              const maybeColorCode = +restOfMessage
+              // An array of valid codes
+              const validColorCodes = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56];
+              const validTeamCodes = [-1,  -2,  -3,  -4,  -100];
+              if (message.startsWith("/")) {
+                //help command
+                if (message.startsWith("/help")) {
+                  if (3 === 3) {
+                  player.body.sendMessage("/km ~ Destroys your tank");
+                  player.body.sendMessage("/questionable ~ You have been warned");
+                  player.body.sendMessage("/team + -100 or -1 ~ changes your team to polygon or to blue");
+                  player.body.sendMessage("/color (color code) ~ changes tank color");
+                  player.body.sendMessage("/test ~ find out how many players are online");
+                  player.body.sendMessage("/closegame ~ Force an Arena Closure");
+                  player.body.sendMessage("/kill (player) ~ kill command");
+                  return 1;
+                  } else {
+                    player.body.sendMessage("/questionable ~ You have been warned");
+                    return 1;
+                  }
+                }
+                // suicide command
+                if (message.startsWith("/km")){
+                  {
+                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey){
+                    player.body.invinc = false,
+                    player.body.destroy();
+                    return 1;
+                    }
+                  }
+                }
+                //why is this a thing
+                if (message.startsWith("/questionable")) {
+                  {
+                    player.body.define(Class.funny);
+                    return 1;
+                  }
+                }
+                if (message.startsWith("/long")) {
+                  {
+                    player.body.define(Class.longer);
+                    return 1;
+                  }
+                }
+                if (message.startsWith("/makeitbigger")) {
+                  {
+                    player.body.define(Class.muchlonger);
+                    return 1;
+                  }
+                }
+                if (message.startsWith("/team ")) {
+                  {
+                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey){
+                    // Check that the array contains the user input (i.e. user input is valid)
+                    if (validTeamCodes.indexOf(teamcode) !== -1) {
+                       if (player.body.team !== teamcode) {
+                       player.body.team = teamcode
+                       player.body.sendMessage('changed team!');
+                       return 1;
+                        } else {player.body.sendMessage("you are already on that team!"); return 1;}
+                      }
+                    }
+                  }
+                }
+                if (message.startsWith("/color ")) {
+                  {
+                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey){
+                    // Check that the array contains the user input (i.e. user input is valid)
+                    if (validColorCodes.indexOf(maybeColorCode) !== -1) {
+                       player.body.color = maybeColorCode
+                       return 1;
+                      }
+                    }
+                  }
+                }
+                if (message.startsWith("/test")) {
+                  {
+                    if (socket.key === devkey || socket.key === betakey || socket.key === seniorkey || socket.key === suskey || socket.key === stevenkey){
+                    sendRequest();
+                    return 1;
+                    }
+                  }
+                }
+                if (message.startsWith("/closegame") && socket.key === devkey) {
+                  {
+                    setTimeout(() => closemode(), 10000);
+                    sockets.broadcast('Closing THe Game Manually');
+                    return 1;
+                  }
+                }
+                if (message.startsWith("/betalel") && socket.key === devkey || socket.key === stevenkey) {
+                  {
+                    player.body.define(Class.betatester);
+                    return 1;
+                  }
+                } 
+                else
+                  return player.body.sendMessage(
+                    "Invalid Command, please try again or use /help"
+                  );
+              }
+              if (util.time() - socket.status.lastChatTime >= 2200) {
+                // Verify it
+                if (typeof message != "string") {
+                  player.body.sendMessage("String lenth parsing error");
+                  return 1;
+                }
+ 
+                if (encodeURI(message).split(/%..|./).length > maxLen) {
+                  player.body.sendMessage(
+                    "Your message is too long. (<100 Characters)"
+                  );
+                  return 1;
+                }
+  
+                let playerName = socket.player.name
+                  ? socket.player.name
+                  : "Player";
+                let chatMessage = playerName + " says: " + message;
+                sockets.broadcast(chatMessage);
+                util.log("[CHAT] " + chatMessage);
+                // Basic chat spam control. //its back
+                socket.status.lastChatTime = util.time();
+              } else
+                player.body.sendMessage("You're sending messages too quickly!");
+            }
+            break;
+                case 'S': { // spawn request 
+                  if (1 === 1) {
+                    if (!socket.status.deceased) { socket.kick('Trying to spawn while already alive.'); return 1; }
+                    if (m.length !== 2) { socket.kick('Ill-sized spawn request.'); return 1; }
+                    // Get data
+                    let name = m[0].replace(c.BANNED_CHARACTERS_REGEX, '');
+                    let needsRoom = m[1];
+                    // Verify it
+                    if (typeof name != 'string') { socket.kick('Bad spawn request.'); return 1; }
+                    if (encodeURI(name).split(/%..|./).length > 48) { socket.kick('Overly-long name.'); return 1; }
+                    if (needsRoom !== -1 && needsRoom !== 0) { socket.kick('Bad spawn request.'); return 1; }
+                    // Bring to life
+                    socket.status.deceased = false;
+                    // Define the player.
+                    if (players.indexOf(socket.player) != -1) { util.remove(players, players.indexOf(socket.player));  }
+                    // Free the old view
+                    if (views.indexOf(socket.view) != -1) { util.remove(views, views.indexOf(socket.view)); socket.makeView(); }
+                    socket.player = socket.spawn(name);
+                    socket.player.name = name;
+                    //socket.token = token;
+                    // Give it the room state
+                    if (!needsRoom) { 
+                        socket.talk(
+                            'R',
+                            room.width,
+                            room.height,
+                            JSON.stringify(c.ROOM_SETUP), 
+                            JSON.stringify(util.serverStartTime),
+                            roomSpeed
+                        );
+                    }
+                    // Start the update rhythm immediately
+                    socket.update(0);  
+                    // Log it    
+                    util.log('[INFO] ' + (m[0]) + (needsRoom !== -1 ? ' joined' : ' rejoined') + ' the game! Players: ' + players.length);   
+                }} break; 
+                  function sendRequest () {
+                    sockets.broadcast('[PLAYER COUNT] ' + 'Players: ' + players.length);
+                  }
+                break;
                 case 's': { // spawn request
                     if (!socket.status.deceased) { socket.kick('Trying to spawn while already alive.'); return 1; }
                     if (m.length !== 2) { socket.kick('Ill-sized spawn request.'); return 1; }
@@ -3321,7 +4194,7 @@ const sockets = (() => {
                             body.name = "\u200b" + body.name;
                             body.define({ CAN_BE_ON_LEADERBOARD: false, });
                         }                        
-                        body.addController(new io_listenToPlayer(body, player)); // Make it listen
+                        body.addController(new iotypes.listenToPlayer(body, player)); // Make it listen
                         body.sendMessage = content => messenger(socket, content); // Make it speak
                         body.invuln = true; // Make it safe
                     player.body = body;

@@ -5893,7 +5893,8 @@ var maintainloop = (() => {
                 }
             }).filter(e => { return e; });    
             // Spawning
-            //spawnBosses(census);
+            spawnBosses(census);
+            spawnCrasher(census);
             // Bots
                 if (bots.length < c.BOTS) {
                     let spot;
