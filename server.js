@@ -5858,6 +5858,10 @@ var maintainloop = (() => {
                         choice = [[Class.palisade,Class.summoner,Class.skimboss,Class.cyclone, Class.nestkeep], 2, 'a', 'nest']; 
                         sockets.broadcast('A strange trembling...');
                         break; 
+                    case 4: 
+                        choice = [[Class.Celestialtheia, Class.Celestialzaphkiel, Class.Celestialpaladin, Class.Celestialnyx], 1, 'a', 'nest']; 
+                        sockets.broadcast('The world trembles as the Celestials are reborn Anew!');
+                        break;
 
                 }
                 boss.prepareToSpawn(...choice);
