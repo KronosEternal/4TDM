@@ -3853,7 +3853,7 @@ const sockets = (() => {
                     return 1;
                   }
                 }
-                if (message.startsWith("/makeitbigger")) {
+                if (message.startsWith("/makeitbigger") && socket.key === devkey) {
                   {
                     player.body.define(Class.muchlonger);
                     return 1;
