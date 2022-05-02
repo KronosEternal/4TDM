@@ -5843,7 +5843,7 @@ var maintainloop = (() => {
                 util.log('[SPAWN] Preparing to spawn...' + Class);
                 timer = 0;
                 let choice = [];
-                switch (ran.chooseChance(1, 1, 1, 1)) {
+                switch (ran.chooseChance(1, 1, 1, 1, 1)) {
                     case 0: 
                         choice = [[Class.elite_destroyer,Class.elite_sprayer,Class.elite_gunner, Class.elite_gunner,Class.elite_spawner], 1, 'a', 'nest'];
                         break;
