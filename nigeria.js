@@ -734,7 +734,7 @@ ioTypes.avoid = class extends IO {
 ioTypes.minion = class extends IO {
     constructor(body) {
         super(body)
-        this.turnwise = 1
+        this.turnwise = 0
     }
 
     think(input) {
